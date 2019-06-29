@@ -27,6 +27,7 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
 #include "utils/handle.h"
@@ -55,15 +56,21 @@
 
 template<class T, int SIZE_LOG2>
 class Conveyor {
-	
+protected:
+
 	static constexpr int QUEUE_SIZE = 1 << SIZE_LOG2;
 	static constexpr int QUEUE_SIZE_MASK = QUEUE_SIZE - 1;
 	
-	T buffers[QUEUE_SIZE - 1];
+public:
+	static constexpr int SLOTS = QUEUE_SIZE - 1;
+
+protected:
+
+	T buffers[SLOTS];
 	Handle<T> handles[QUEUE_SIZE];
 	uint8_t c,f,p,e;
 	
-	static uint8_t next(uint8_t i){
+	static constexpr uint8_t next(uint8_t i) {
 		return (i+1) & QUEUE_SIZE_MASK;
 	}
 
@@ -76,7 +83,7 @@ public:
 		p = 0;
 		e = 1;
 		
-		for(uint8_t i = 0;i < QUEUE_SIZE - 1; ++i){
+		for(uint8_t i = 0;i < SLOTS; ++i){
 			handles[i+1].p = &buffers[i];
 		}
 	}
