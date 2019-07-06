@@ -46,12 +46,10 @@
 * SIZE_LOG2: number of buffer slots, given as a power of 2
 * 
 * 
-* Usage: the information producer uses fetch() to obtain a buffer handle. If the
-* handle is valid, it can be written, then put on the conveyor by calling
-* enqueue(handle). The information consumer uses dequeue() to obtain a filled
-* buffer. If the received handle is valid, the data can be read. After a handles
-* contents are consumed, it should be returned by calling recycle(handle), so it
-* can be reused.
+* Usage: The information producer uses the Producer subclass, which can be
+* obtained from the conveyor with the producer() function. The information
+* consumer uses the Consumer subclass, which can be obtained using the
+* consumer() function. For usage of the subclasses see their descriptions.
 */
 
 template<class T, int SIZE_LOG2>
@@ -76,48 +74,94 @@ protected:
 
 	
 public:
-	
-	Conveyor(){
-		c = 0;
-		f = 0;
-		p = 0;
-		e = 1;
-		
+	Conveyor() : c(0), f(0), p(0), e(1) {
+		// initialize handles that will be served to producers and consumers
 		for(uint8_t i = 0;i < SLOTS; ++i){
 			handles[i+1].p = &buffers[i];
 		}
 	}
 	
-	Handle<T> fetch(){
-		Handle<T> h;
+	////////////////////////////////////////////////////////////////////////////
+
+	/*
+	* Producer class represents the source of items on a conveyor. A conveyor
+	* can have multiple producers if they obey the restrictions for access,
+	* while a producer is bound to a conveyor when it is created.
+	*
+	* Usage: A producer can use fetch() to obtain a buffer handle. If the handle
+	* is valid, it can be written, then put on the conveyor by calling
+	* enqueue(handle). The enqueued buffers can be accessed by a consumer, in
+	* order of the queing.
+	*/
+	class Producer{
+
+	protected:
+		Conveyor<T, SIZE_LOG2>& c;
 		
-		if (e != c){
-			h = handles[e];
-			e = next(e);
+	public:
+		Producer(Conveyor<T, SIZE_LOG2>& conveyor) : c(conveyor){}
+
+		Handle<T> fetch(){
+			Handle<T> h;
+
+			if (c.e != c.c){
+				h = c.handles[c.e];
+				c.e = next(c.e);
+			}
+
+			return h;
 		}
 		
-		return h;
-	}
+		void enqueue(Handle<T> h){
+			c.handles[c.p] = h;
+			c.p = next(c.p);
+		}
 	
-	void enqueue(Handle<T> h){
-		handles[p] = h;
-		p = next(p);
-	}
+	};
 	
-	Handle<T> dequeue(){
-		Handle<T> h;
+	Producer producer(){
+		return Producer(*this);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	/*
+	* Consumer class represents the destination of items on a conveyor.
+	* A conveyor can have multiple consumers if they obey the restrictions for
+	* access, while a consumer is bound to a conveyor when it is created.
+	*
+	* Usage: The information consumer uses dequeue() to obtain a filled buffer.
+	* If the received handle is valid, the data can be read. After a handles
+	* contents are consumed, it should be returned by calling recycle(handle),
+	* so it can be reused by a producer.
+	*/
+	class Consumer{
 		
-		if (f != p){
-			h = handles[f];
-			f = next(f);
+	protected:
+		Conveyor<T, SIZE_LOG2>& c;
+		
+	public:
+		Consumer(Conveyor<T, SIZE_LOG2>& conveyor) : c(conveyor){}
+	
+		Handle<T> dequeue(){
+			Handle<T> h;
+			
+			if (c.f != c.p){
+				h = c.handles[c.f];
+				c.f = next(c.f);
+			}
+			
+			return h;
 		}
 		
-		return h;
-	}
+		void recycle(Handle<T> h){
+			c.handles[c.c] = h;
+			c.c = next(c.c);
+		}
+	};
 	
-	void recycle(Handle<T> h){
-		handles[c] = h;
-		c = next(c);
+	Consumer consumer(){
+		return Consumer(*this);
 	}
 	
 };
